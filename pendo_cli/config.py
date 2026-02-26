@@ -10,14 +10,14 @@ from dotenv import load_dotenv
 from pendo_cli.api.models import PendoConfig
 
 # Supported subscription names for multi-subscription support
-SUBSCRIPTION_NAMES = ("default", "roadmaps")
+SUBSCRIPTION_NAMES = ("default", "roadmaps", "portfolios")
 
 
 def get_config(subscription: Optional[str] = None, env_file: Optional[Path] = None) -> PendoConfig:
     """Load PendoConfig for the given subscription.
 
     Args:
-        subscription: Name of subscription ("default" or "roadmaps").
+        subscription: Name of subscription ("default", "roadmaps", or "portfolios").
             If None, uses PENDO_SUBSCRIPTION env var (default "default").
         env_file: Optional path to .env file.
 
@@ -46,13 +46,19 @@ def get_config(subscription: Optional[str] = None, env_file: Optional[Path] = No
         subscription_id = os.getenv("PENDO_SUBSCRIPTION_ID", "4598576627318784")
         app_id = os.getenv("PENDO_APP_ID", "-323232")
         api_key = os.getenv("PENDO_API_KEY")
-    else:
-        # roadmaps
+    elif name == "roadmaps":
         subscription_id = os.getenv(
             "PENDO_ROADMAPS_SUBSCRIPTION_ID", "6602363610660864"
         )
         app_id = os.getenv("PENDO_ROADMAPS_APP_ID", "5553517598146560")
         api_key = os.getenv("PENDO_ROADMAPS_API_KEY")
+    else:
+        # portfolios
+        subscription_id = os.getenv(
+            "PENDO_PORTFOLIOS_SUBSCRIPTION_ID", "5878812817883136"
+        )
+        app_id = os.getenv("PENDO_PORTFOLIOS_APP_ID", "-323232")
+        api_key = os.getenv("PENDO_PORTFOLIOS_API_KEY")
 
     return PendoConfig(
         subscription_id=subscription_id,

@@ -55,7 +55,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--subscription",
-        choices=["default", "roadmaps"],
+        choices=["default", "roadmaps", "portfolios"],
         default=None,
         help="Pendo subscription to use (default: PENDO_SUBSCRIPTION env or 'default')",
     )
