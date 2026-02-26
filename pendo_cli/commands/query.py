@@ -1,11 +1,8 @@
 """Query commands for Pendo data."""
 
-import os
 from datetime import datetime, timezone
 from typing import Any
 import logging
-
-from dotenv import load_dotenv
 
 from pendo_cli.commands.base import BaseCommand
 from pendo_cli.api.client import PendoClient, PendoConfig
@@ -26,17 +23,10 @@ class QueryCommand(BaseCommand):
         Returns:
             True on success, False on failure
         """
-        load_dotenv()
+        from pendo_cli.config import get_config
 
-        subscription_id = os.getenv("PENDO_SUBSCRIPTION_ID", "4598576627318784")
-        app_id = os.getenv("PENDO_APP_ID", "-323232")
-        api_key = os.getenv("PENDO_API_KEY")
-
-        config = PendoConfig(
-            subscription_id=subscription_id,
-            app_id=app_id,
-            api_key=api_key,
-        )
+        subscription = getattr(self.args, "subscription", None)
+        config = get_config(subscription)
 
         query_type = getattr(self.args, "query_type", None)
 
@@ -48,6 +38,8 @@ class QueryCommand(BaseCommand):
                 return await self._query_accounts(client)
             elif query_type == "activity":
                 return await self._query_activity(client)
+            elif query_type == "wau":
+                return await self._query_wau(client)
             elif query_type == "events":
                 return await self._query_events(client)
             else:
@@ -113,6 +105,59 @@ class QueryCommand(BaseCommand):
 
         # TODO: Implement actual query via Pendo API
         self.logger.warning("Activity query not yet fully implemented")
+        return True
+
+    async def _query_wau(self, client: PendoClient) -> bool:
+        """Query weekly (or N-day) active users: unique visitors with activity in the window.
+
+        Uses Pendo aggregation: trackEvents in time range, then count distinct visitorIds.
+        """
+        last_days = getattr(self.args, "last_days", 7)
+        last_days = max(1, min(last_days, 365))
+
+        self.logger.info(f"Querying unique active visitors (last {last_days} days)...")
+
+        time_series = {
+            "period": "dayRange",
+            "first": "now()",
+            "count": -last_days,
+        }
+        # Pipeline: any track event in window -> distinct visitorIds -> count
+        pipeline = [
+            {
+                "source": {
+                    "trackEvents": {},
+                    "timeSeries": time_series,
+                },
+            },
+            {"identified": "visitorId"},
+            {"select": {"visitorId": "visitorId"}},
+            {"group": {"group": ["visitorId"], "fields": {}}},
+            {"group": {"group": [], "fields": {"wau": {"count": "visitorId"}}}},
+        ]
+
+        body = {
+            "response": {"mimeType": "application/json"},
+            "request": {
+                "requestId": "wau",
+                "pipeline": pipeline,
+            },
+        }
+
+        result = await client.post_aggregation(body)
+        if result.get("errors"):
+            for err in result["errors"]:
+                self.logger.error(err)
+            return False
+        data = result.get("data") or {}
+        results = data.get("results", [])
+        if results:
+            wau = results[0].get("wau", 0)
+            self.logger.info(f"Unique active visitors (last {last_days} days): {wau}")
+            print(wau)
+        else:
+            self.logger.info("No results")
+            print(0)
         return True
 
     async def _query_events(self, client: PendoClient) -> bool:

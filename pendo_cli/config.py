@@ -7,6 +7,62 @@ from dataclasses import dataclass, field
 
 from dotenv import load_dotenv
 
+from pendo_cli.api.models import PendoConfig
+
+# Supported subscription names for multi-subscription support
+SUBSCRIPTION_NAMES = ("default", "roadmaps")
+
+
+def get_config(subscription: Optional[str] = None, env_file: Optional[Path] = None) -> PendoConfig:
+    """Load PendoConfig for the given subscription.
+
+    Args:
+        subscription: Name of subscription ("default" or "roadmaps").
+            If None, uses PENDO_SUBSCRIPTION env var (default "default").
+        env_file: Optional path to .env file.
+
+    Returns:
+        PendoConfig for the selected subscription.
+
+    Raises:
+        ValueError: If subscription name is not supported.
+    """
+    if env_file:
+        load_dotenv(env_file)
+    else:
+        load_dotenv()
+
+    name = (subscription or os.getenv("PENDO_SUBSCRIPTION", "default")).strip().lower()
+    if name not in SUBSCRIPTION_NAMES:
+        raise ValueError(
+            f"Unknown subscription {name!r}. Use one of: {', '.join(SUBSCRIPTION_NAMES)}"
+        )
+
+    base_url = os.getenv("PENDO_BASE_URL", "https://app.pendo.io")
+    timeout = int(os.getenv("PENDO_TIMEOUT", "30"))
+    max_retries = int(os.getenv("PENDO_MAX_RETRIES", "3"))
+
+    if name == "default":
+        subscription_id = os.getenv("PENDO_SUBSCRIPTION_ID", "4598576627318784")
+        app_id = os.getenv("PENDO_APP_ID", "-323232")
+        api_key = os.getenv("PENDO_API_KEY")
+    else:
+        # roadmaps
+        subscription_id = os.getenv(
+            "PENDO_ROADMAPS_SUBSCRIPTION_ID", "6602363610660864"
+        )
+        app_id = os.getenv("PENDO_ROADMAPS_APP_ID", "5553517598146560")
+        api_key = os.getenv("PENDO_ROADMAPS_API_KEY")
+
+    return PendoConfig(
+        subscription_id=subscription_id,
+        app_id=app_id,
+        base_url=base_url,
+        timeout=timeout,
+        max_retries=max_retries,
+        api_key=api_key,
+    )
+
 
 @dataclass
 class Config:

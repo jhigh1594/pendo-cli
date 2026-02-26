@@ -23,19 +23,10 @@ class SegmentCommand(BaseCommand):
         Returns:
             True on success, False on failure
         """
-        # Load configuration from environment
-        import os
-        from dotenv import load_dotenv
+        from pendo_cli.config import get_config
 
-        load_dotenv()
-
-        subscription_id = os.getenv("PENDO_SUBSCRIPTION_ID", "4598576627318784")
-        app_id = os.getenv("PENDO_APP_ID", "-323232")
-
-        config = PendoConfig(
-            subscription_id=subscription_id,
-            app_id=app_id
-        )
+        subscription = getattr(self.args, "subscription", None)
+        config = get_config(subscription)
 
         action = getattr(self.args, "segment_action", None)
 

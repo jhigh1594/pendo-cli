@@ -53,6 +53,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Enable verbose logging",
     )
+    parser.add_argument(
+        "--subscription",
+        choices=["default", "roadmaps"],
+        default=None,
+        help="Pendo subscription to use (default: PENDO_SUBSCRIPTION env or 'default')",
+    )
 
     # Add subcommands
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -93,6 +99,16 @@ def parse_args() -> argparse.Namespace:
     query_subparsers.add_parser("visitors", help="Query visitors")
     query_subparsers.add_parser("accounts", help="Query accounts")
     query_subparsers.add_parser("activity", help="Query activity")
+    wau_parser = query_subparsers.add_parser(
+        "wau", help="Weekly (or N-day) active users: unique visitors with activity in window"
+    )
+    wau_parser.add_argument(
+        "--last-days",
+        type=int,
+        default=7,
+        metavar="N",
+        help="Count unique visitors active in the last N days (default: 7)",
+    )
     events_parser = query_subparsers.add_parser(
         "events", help="Query track event counts (e.g. cards created)"
     )
