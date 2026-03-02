@@ -5,9 +5,10 @@ Full-featured CLI tool for Pendo's Engage API with complete CRUD capabilities fo
 ## Features
 
 - **Segment Management**: Create, list, update, delete segments
-- **Visitor Queries**: Query visitors with filters
-- **Activity Analytics**: Run aggregation queries
-- **Export**: Export data to JSON/CSV
+- **Usage Analytics**: DAU/WAU/MAU, feature usage, page usage (for product analytics)
+- **Cohort Exports**: Export visitors and accounts with metadata for AI/BI analysis
+- **Track Event Counts**: Query custom events (e.g. cards created) with date ranges
+- **Multiple Subscriptions**: default (AgilePlace), roadmaps, portfolios, viz
 
 ## Quick Start
 
@@ -33,10 +34,13 @@ cp .env.example .env
 ```bash
 PENDO_SUBSCRIPTION_ID=4598576627318784
 PENDO_APP_ID=-323232
-
-# For write operations (create/update/delete):
 PENDO_API_KEY=your-integration-key-here
+
+# Optional: Multi-subscription (roadmaps, portfolios, viz)
+# See .env.example for PENDO_ROADMAPS_*, PENDO_PORTFOLIOS_*, PENDO_VIZ_*
 ```
+
+Use `--subscription roadmaps` (or `portfolios`, `viz`) on query commands to target a different app.
 
 **Finding your credentials:**
 - Subscription ID and App ID: Pendo → Settings → Subscription Settings
@@ -62,15 +66,59 @@ python3 -m pendo_cli segment delete SEGMENT_ID
 
 ### Query Commands
 
+#### Usage Analytics (for Sr PMs)
+
 ```bash
-# Query visitors
-python3 -m pendo_cli query visitors --last-days 30
+# Active users: WAU (default), DAU, MAU, or custom window
+python3 -m pendo_cli query usage --mode wau
+python3 -m pendo_cli query usage --mode mau --format json
+python3 -m pendo_cli query usage --mode custom --last-days 14 --group-by account
 
-# Query accounts
-python3 -m pendo_cli query accounts --last-days 30
+# Feature usage: top features by events and time
+python3 -m pendo_cli query features --top 10 --format csv
+python3 -m pendo_cli query features --feature-id FEATURE_ID --format json
 
-# Query activity
-python3 -m pendo_cli query activity --entity visitor --group-by daysActive
+# Page usage: top pages by events
+python3 -m pendo_cli query pages --top 20 --last-days 30
+```
+
+#### Cohort and Segment Exports
+
+```bash
+# Export visitors with metadata (for AI assistants or BI)
+python3 -m pendo_cli query visitors --format csv
+python3 -m pendo_cli query visitors --new-last-days 7 --format json   # New signups last 7 days
+python3 -m pendo_cli query visitors --inactive-days 14 --format csv  # No activity in 14 days
+
+# Export accounts with ARR, plan, CSM
+python3 -m pendo_cli query accounts --format csv
+python3 -m pendo_cli query accounts --new-last-days 30 --format json
+```
+
+#### Track Events and WAU
+
+```bash
+# WAU (or N-day active users)
+python3 -m pendo_cli query wau --last-days 7
+python3 -m pendo_cli query wau --from-date 2025-01-01 --to-date 2025-01-31 --subscription default
+
+# Custom track event counts
+python3 -m pendo_cli query events --event-name "core-card-service POST /io/card" --from-date 2025-01-01 --to-date 2025-12-31
+```
+
+#### Output Formats
+
+All query commands support `--format table|json|csv`:
+- `table` (default): Human-readable aligned columns
+- `json`: Machine-friendly for pipelines or AI tools
+- `csv`: For spreadsheets or data analysis
+
+#### Using with AI Assistants
+
+Pipe JSON output for analysis:
+```bash
+python3 -m pendo_cli query visitors --format json | head -c 50000  # First 50KB for context
+python3 -m pendo_cli query usage --mode mau --format json
 ```
 
 ### Export Commands
@@ -200,7 +248,7 @@ MIT License - see LICENSE file for details.
 
 ## Roadmap
 
-- [ ] Full Pendo MCP integration (aggregation queries)
+- [x] Aggregation queries (usage, features, pages, visitors, accounts)
 - [ ] Guide management commands
 - [ ] Export command implementation
 - [ ] Interactive mode with prompts

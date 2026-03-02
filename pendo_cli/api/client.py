@@ -149,8 +149,9 @@ class PendoClient:
     async def post_aggregation(self, body: Dict[str, Any]) -> Dict[str, Any]:
         """Run an aggregation pipeline.
 
-        Requires config.api_key (X-Pendo-Integration-Key). Pipeline runs
-        in the context of the subscription.
+        Requires config.api_key (X-Pendo-Integration-Key). The app/subscription
+        is determined by this config (subscription_id, app_id, api_key); use
+        get_config(subscription) so different subscriptions hit different Pendo apps.
 
         Args:
             body: JSON body with response and request.pipeline

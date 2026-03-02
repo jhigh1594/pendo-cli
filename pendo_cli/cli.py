@@ -53,12 +53,6 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Enable verbose logging",
     )
-    parser.add_argument(
-        "--subscription",
-        choices=["default", "roadmaps", "portfolios"],
-        default=None,
-        help="Pendo subscription to use (default: PENDO_SUBSCRIPTION env or 'default')",
-    )
 
     # Add subcommands
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -96,11 +90,139 @@ def parse_args() -> argparse.Namespace:
     # Query commands
     query_parser = subparsers.add_parser("query", help="Query data")
     query_subparsers = query_parser.add_subparsers(dest="query_type")
-    query_subparsers.add_parser("visitors", help="Query visitors")
-    query_subparsers.add_parser("accounts", help="Query accounts")
-    query_subparsers.add_parser("activity", help="Query activity")
+
+    def _add_shared_query_opts(p, include_subscription=True, include_dates=True):
+        """Add shared --subscription, date, and format options to a query subparser."""
+        if include_subscription:
+            p.add_argument(
+                "--subscription",
+                choices=["default", "roadmaps", "portfolios", "viz"],
+                default="default",
+                help="Pendo app: default=AgilePlace, roadmaps=Roadmaps, portfolios=OKRs, viz=Viz",
+            )
+        if include_dates:
+            p.add_argument("--from-date", default=None, help="Start date YYYY-MM-DD")
+            p.add_argument("--to-date", default=None, help="End date YYYY-MM-DD")
+            p.add_argument(
+                "--last-days",
+                type=int,
+                default=None,
+                metavar="N",
+                help="Use last N days (overrides --from-date/--to-date when set)",
+            )
+        p.add_argument(
+            "--format",
+            choices=["table", "json", "csv"],
+            default="table",
+            help="Output format: table (human-readable), json, or csv (default: table)",
+        )
+
+    # visitors: export with metadata and cohort filters
+    visitors_parser = query_subparsers.add_parser(
+        "visitors", help="Export visitors with metadata (for segments/cohorts)"
+    )
+    _add_shared_query_opts(visitors_parser)
+    visitors_parser.add_argument(
+        "--new-last-days",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Only visitors first seen in last N days (cohort filter)",
+    )
+    visitors_parser.add_argument(
+        "--inactive-days",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Only visitors with no activity in last N days",
+    )
+
+    # accounts: export with metadata
+    accounts_parser = query_subparsers.add_parser(
+        "accounts", help="Export accounts with metadata (ARR, plan, CSM, etc.)"
+    )
+    _add_shared_query_opts(accounts_parser)
+    accounts_parser.add_argument(
+        "--new-last-days",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Only accounts first seen in last N days",
+    )
+
+    query_subparsers.add_parser("activity", help="Query activity metrics (placeholder)")
+    # usage: DAU/WAU/MAU and custom N-day active users
+    usage_parser = query_subparsers.add_parser(
+        "usage", help="Active user counts: DAU, WAU, MAU, or custom N-day window"
+    )
+    _add_shared_query_opts(usage_parser)
+    usage_parser.add_argument(
+        "--mode",
+        choices=["dau", "wau", "mau", "custom"],
+        default="wau",
+        help="dau=1 day, wau=7 days, mau=30 days, custom=--last-days (default: wau)",
+    )
+    usage_parser.add_argument(
+        "--group-by",
+        choices=["none", "account"],
+        default="none",
+        help="Break down by account (default: none = single total)",
+    )
+
+    # features: top features by usage
+    features_parser = query_subparsers.add_parser(
+        "features", help="Feature usage: events, minutes, visitors by feature"
+    )
+    _add_shared_query_opts(features_parser)
+    features_parser.add_argument(
+        "--top",
+        type=int,
+        default=10,
+        metavar="N",
+        help="Top N features by event count (default: 10)",
+    )
+    features_parser.add_argument(
+        "--feature-id",
+        default=None,
+        help="Filter to a specific feature ID",
+    )
+    features_parser.add_argument(
+        "--list-all",
+        action="store_true",
+        help="List all feature definitions for the subscription (ignore time window and usage)",
+    )
+
+    # pages: top pages by usage
+    pages_parser = query_subparsers.add_parser(
+        "pages", help="Page usage: events, minutes, visitors by page"
+    )
+    _add_shared_query_opts(pages_parser)
+    pages_parser.add_argument(
+        "--top",
+        type=int,
+        default=10,
+        metavar="N",
+        help="Top N pages by event count (default: 10)",
+    )
+    pages_parser.add_argument(
+        "--page-id",
+        default=None,
+        help="Filter to a specific page ID",
+    )
+    pages_parser.add_argument(
+        "--list-all",
+        action="store_true",
+        help="List all pages for the subscription (ignore time window and usage)",
+    )
+
     wau_parser = query_subparsers.add_parser(
         "wau", help="Weekly (or N-day) active users: unique visitors with activity in window"
+    )
+    wau_parser.add_argument(
+        "--subscription",
+        choices=["default", "roadmaps", "portfolios", "viz"],
+        default="default",
+        help="Pendo app: default=AgilePlace, roadmaps=Roadmaps, portfolios=OKRs, viz=Viz",
     )
     wau_parser.add_argument(
         "--last-days",
@@ -109,8 +231,28 @@ def parse_args() -> argparse.Namespace:
         metavar="N",
         help="Count unique visitors active in the last N days (default: 7)",
     )
+    wau_parser.add_argument("--from-date", default=None, help="Start date YYYY-MM-DD (e.g. 2025-10-01)")
+    wau_parser.add_argument("--to-date", default=None, help="End date YYYY-MM-DD (e.g. 2025-12-31)")
+    wau_parser.add_argument(
+        "--format",
+        choices=["table", "json", "csv"],
+        default="table",
+        help="Output format (default: table)",
+    )
     events_parser = query_subparsers.add_parser(
         "events", help="Query track event counts (e.g. cards created)"
+    )
+    events_parser.add_argument(
+        "--subscription",
+        choices=["default", "roadmaps", "portfolios", "viz"],
+        default="default",
+        help="Pendo app subscription",
+    )
+    events_parser.add_argument(
+        "--format",
+        choices=["table", "json", "csv"],
+        default="table",
+        help="Output format (default: table)",
     )
     events_parser.add_argument(
         "--event-name",
@@ -131,6 +273,11 @@ def parse_args() -> argparse.Namespace:
         "--country",
         default="US",
         help="Filter by visitor country code, e.g. US (default: US)",
+    )
+    events_parser.add_argument(
+        "--list-types",
+        action="store_true",
+        help="List distinct track event names and counts for the subscription",
     )
 
     # Export commands (placeholder for future implementation)
